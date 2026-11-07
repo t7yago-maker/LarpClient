@@ -1,0 +1,47 @@
+name: Build LarpClient
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extrair o projeto
+        run: |
+          unzip -o LarpClient.zip -d proj
+          ls proj/LarpClient
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 8
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 7.6.4
+
+      - name: Compilar
+        working-directory: proj/LarpClient
+        run: gradle build --no-daemon --stacktrace
+
+      - name: Guardar o JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: LarpClient-jar
+          path: proj/LarpClient/build/libs/LarpClient-0.1.0.jar
+          if-no-files-found: warn
+
+      - name: Publicar release com o JAR
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: LarpClient build ${{ github.run_number }}
+          files: proj/LarpClient/build/libs/LarpClient-0.1.0.jar
+          
