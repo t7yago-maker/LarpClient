@@ -16,26 +16,39 @@ jobs:
       - name: Extrair o projeto
         run: |
           unzip -o LarpClient.zip -d proj
+          chmod +x proj/LarpClient/gradlew
           ls proj/LarpClient
 
-      - uses: actions/setup-java@v4
+      - name: Java 17
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 8
+          java-version: 17
 
-      - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: 7.6.4
+      - name: Gradle
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Compilar
         working-directory: proj/LarpClient
-        run: gradle build --no-daemon --stacktrace
+        run: |
+          set -o pipefail
+          ./gradlew build --stacktrace 2>&1 | tee ../../build.log
+
+      - name: Mostrar o erro no resumo
+        if: failure()
+        run: |
+          echo "## ERRO DO BUILD (tire print desta parte)" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          grep -n -E "What went wrong|error:|Could not|FAILED|Caused by|Exception" build.log | head -25 >> $GITHUB_STEP_SUMMARY || true
+          echo '--- final do log ---' >> $GITHUB_STEP_SUMMARY
+          tail -n 25 build.log >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
 
       - name: Guardar o JAR
         uses: actions/upload-artifact@v4
         with:
           name: LarpClient-jar
-          path: proj/LarpClient/build/libs/LarpClient-0.1.0.jar
+          path: proj/LarpClient/build/libs/*.jar
           if-no-files-found: warn
 
       - name: Publicar release com o JAR
@@ -43,5 +56,5 @@ jobs:
         with:
           tag_name: build-${{ github.run_number }}
           name: LarpClient build ${{ github.run_number }}
-          files: proj/LarpClient/build/libs/LarpClient-0.1.0.jar
+          files: proj/LarpClient/build/libs/larpclient-0.1.0.jar
           
