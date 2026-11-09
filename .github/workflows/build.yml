@@ -12,22 +12,28 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Achar e extrair o projeto
         run: |
           echo "Arquivos na raiz do repositorio:"
           ls -la
           Z=""
+          BEST=0
           for f in *.zip; do
-            if [ -f "$f" ] && unzip -l "$f" | grep -q "gradlew$"; then Z="$f"; break; fi
+            [ -f "$f" ] || continue
+            unzip -l "$f" | grep -q "gradlew$" || continue
+            T=$(git log -1 --format=%ct -- "$f" 2>/dev/null || echo 0)
+            echo "zip: $f (commit time $T)"
+            if [ "${T:-0}" -ge "$BEST" ]; then BEST="${T:-0}"; Z="$f"; fi
           done
           if [ -z "$Z" ]; then
             {
-              echo "## ERRO: nenhum ZIP novo do LarpClient foi encontrado no repositorio"
-              echo "Envie de novo o LarpClient.zip (Add file > Upload files)."
+              echo "## ERRO: nenhum ZIP do LarpClient (com gradlew) foi encontrado no repositorio"
+              echo "Envie o LarpClient.zip (Add file > Upload files)."
               echo "ZIPs vistos na raiz: $(ls *.zip 2>&1)"
             } >> $GITHUB_STEP_SUMMARY
-            echo "Nenhum zip com gradlew encontrado"
             exit 1
           fi
           echo "Usando o zip: $Z"
@@ -58,7 +64,7 @@ jobs:
           if [ -f build.log ]; then
             echo "## ERRO DO BUILD (tire print desta parte)" >> $GITHUB_STEP_SUMMARY
             echo '```' >> $GITHUB_STEP_SUMMARY
-            grep -n -E "What went wrong|error:|Could not|FAILED|Caused by" build.log | head -25 >> $GITHUB_STEP_SUMMARY || true
+            grep -n -E "error:|What went wrong|Could not|FAILED|Caused by" build.log | head -40 >> $GITHUB_STEP_SUMMARY || true
             echo '--- final do log ---' >> $GITHUB_STEP_SUMMARY
             tail -n 25 build.log >> $GITHUB_STEP_SUMMARY
             echo '```' >> $GITHUB_STEP_SUMMARY
